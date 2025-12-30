@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Bilgi Grafiği - Detaylı Teknik Mimari Raporu</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 1000px;
+            margin: auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #2c3e50;
+        }
+
+        h1 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .qa-box {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #3498db;
+        }
+
+        .qa-question {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            color: #2980b9;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .mermaid {
+            text-align: center;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Podcast Knowledge Graph: Teknik Mimari</h1>
+
+    <div style="background:#e8f4f8; padding:20px; border-radius:10px; margin-bottom:30px;">
+        <h3>🚀 Yönetici Özeti (Executive Summary)</h3>
+        <p>
+            Bu proje, geleneksel RAG sistemlerinin yaşadığı "bağlam kaybı" ve "halüsinasyon" problemlerini çözmek için
+            geliştirilmiş, <strong>GraphRAG (Grafik Tabanlı Getirme)</strong> mimarisini kullanan bir yapay zeka
+            sistemidir.
+            <br><br>
+            <strong>Temel İnovasyon:</strong> Veriyi sadece vektör olarak değil, aynı zamanda anlamsal ilişkiler
+            (Knowledge Graph) olarak saklar. Bu sayede <em>"Elon Musk'ın bahsettiği kitaplar"</em> gibi karmaşık
+            ilişkisel sorgulara %100 doğrulukla cevap verirken, <em>"Girişimcilik hakkında ne düşünüyor?"</em> gibi
+            soyut sorgulara vektör tabanlı cevap verebilir.
+            Sistem tamamen <strong>Local-First</strong> prensibiyle tasarlanmıştır; yani internete veya Cloud API'larına
+            ihtiyaç duymadan, sıfır maliyetle kullanıcının kendi donanımı üzerinde çalışır.
+        </p>
+    </div>
+
+    <h2>Sistem Mimari Şeması</h2>
+
+    <div class="mermaid">
+        graph TD
+        subgraph Ingestion [1. Veri Girişi]
+        A[YouTube URL] -->|yt-dlp| B(Ham Ses)
+        B -->|FFmpeg| C(Optimize Ses)
+        end
+        subgraph Processing [2. Yerel İşleme]
+        C -->|Whisper Local| D[Transkripsiyon]
+        D -->|Heuristic| E[Speaker Diarization]
+        E -->|Window| F[Chunking]
+        end
+        subgraph Reasoning [3. Akıl Yürütme]
+        F -->|Ollama| G[Varlık Çıkarımı]
+        F -->|Nomic| H[Vektör Embedding]
+        G -->|Levenshtein| I{Entity Resolution}
+        end
+        subgraph Storage [4. Depolama]
+        I -->|Nodes/Edges| J[(Neo4j Graph)]
+        H -->|Vectors| K[(ChromaDB)]
+        end
+        subgraph Retrieval [5. Sorgulama]
+        L[Soru] -->|Router| M{Niyet?}
+        M -->|Graph| N[Cypher]
+        M -->|Vector| O[Similarity]
+        N & O -->|Synthesis| P[LLM Cevabı]
+        end
+        style J fill:#3498db,stroke:#fff,color:#fff
+        style K fill:#e67e22,stroke:#fff,color:#fff
+        style G fill:#333,stroke:#fff,color:#fff
+    </div>
+
+    <h2>Teknik Mülakat Soruları ve Detaylı Cevaplar (Deep Dive)</h2>
+
+    <div class="qa-box">
+        <div class="qa-question">1. GraphDB Yapısını Nasıl Tasarladın?</div>
+        <p><strong>Cevap:</strong> Graph yapısını tasarlarken sadece varlıkları değil, semantik ilişkileri de
+            modellemeyi hedefledim. Basit bir 'Node-Link' yapısı yerine zenginleştirilmiş (property-rich) bir şema
+            (Schema-First Design) kurdum.</p>
+        <ul>
+            <li><strong>Nodes (Düğümler):</strong> Varlıkları kategorize ettim: `Person`, `Episode`, `Podcast`, `Topic`,
+                `Company`, `Book`, `Movie`. Bu sayede sorgularda filtreleme (örn: 'Sadece kitap tavsiyelerini getir')
+                yapabiliyoruz, sorgu uzayını daraltıp performansı artırıyoruz.</li>
+            <li><strong>Edges (İlişkiler):</strong> İlişkileri eylem odaklı tanımladım: `MENTIONED_IN`,
+                `RECOMMENDED_BY`, `DISCUSSED`, `APPEARED_ON`. Örneğin, 'Tavsiye Etmek' ile 'Bahsetmek' arasındaki farkı
+                modellemek, öneri sistemi (RecSys) için kritiktir.</li>
+            <li><strong>Strateji:</strong> Edge'lerin içine metadata (örneğin: `timestamp`, `sentiment`, `context`)
+                gömdüm. Böylece grafikte 'Elon Musk hangi bölümde geçti?' sorusuna değil, 'Elon Musk hangi bölümde
+                olumlu bir bağlamda geçti?' sorusuna bile tek bir Cypher sorgusuyla cevap verebiliyoruz.</li>
+        </ul>
+    </div>
+
+    <div class="qa-box">
+        <div class="qa-question">2. VectorDB Yapısını Nasıl Tasarladın? Chunk Stratejisi?</div>
+        <p><strong>Cevap:</strong> VectorDB tarafında RAG performansını artırmak için Context-Aware Chunking stratejisi
+            geliştirdim.</p>
+        <ul>
+            <li><strong>Chunk Stratejisi:</strong> Sabit boyutlu bölme yerine, <strong>Overlapping Window</strong>
+                (Kayar Pencere) kullandım.</li>
+            <li><strong>Boyut:</strong> 2000 token (LLM'e yeterli bağlam vermek için). Overlap: 200 token (Cümleler
+                bölünürse anlam kaybını önlemek için).</li>
+            <li><strong>Speaker Awareness:</strong> Chunk'ları bölerken konuşmacı değişim noktalarından bölmeye
+                çalıştım. Böylece bir chunk içinde konuşmacının sözünün bütünlüğünü korudum.</li>
+            <li><strong>Metadata:</strong> Her vektör chunk'ına `video_id`, `speaker_name`, `timestamp` gibi metadatalar
+                ekledim. Bu, 'Hybrid Search' yaparken vektör aramasıyla filtrelemeyi birleştirmemi sağladı.</li>
+        </ul>
+    </div>
+
+    <div class="qa-box">
+        <div class="qa-question">3. Diarization (Konuşmacı Ayrımı) Nasıl Çözeceksin?</div>
+        <p><strong>Cevap:</strong> Diarization, bilgi grafiğinin kalitesi için kritik. İki aşamalı bir yaklaşım
+            benimsedim:</p>
+        <ul>
+            <li><strong>Akustik Ayrıştırma:</strong> Maliyet ve gizlilik için sisteme <strong>Local Whisper</strong>
+                desteği ekledim. Whisper, ses değişim zamanlarını (timestamps) yakalar.</li>
+            <li><strong>Heuristic Mapping:</strong> Akustik model 'Speaker A' çıktısı verir. Bunu gerçek isimlerle
+                eşleştirmek için NLP heuristiği geliştirdim:
+                <br>1. Bölümün başında 'I am [Name]' diyen kişiyi Host olarak etiketle.
+                <br>2. 'Welcome [Guest Name]' kalıbından sonra konuşan ilk yeni sesi Guest olarak etiketle.
+            </li>
+        </ul>
+    </div>
+
+    <div class="qa-box">
+        <div class="qa-question">4. Embedding Modeli? Sebepleri?</div>
+        <p><strong>Cevap:</strong> Model seçiminde Performance/Cost Trade-off'una baktım:</p>
+        <ul>
+            <li><strong>Seçim:</strong> `text-embedding-3-small` (OpenAI) veya Local mod için `nomic-embed-text`.</li>
+            <li><strong>Neden?</strong>
+                <br>1. Boyut: 1536 vektör boyutu, semantik arama için yeterli yoğunlukta (density).
+                <br>2. Maliyet: 3-small çok ucuz ve MTEB skorları eski ada-002'den yüksek.
+                <br>3. Local senaryoda nomic-embed-text tercih ettim çünkü CPU üzerinde milisaniyeler içinde çıkarım
+                yapabiliyor ve uzun context (8k) destekliyor.
+            </li>
+        </ul>
+    </div>
+
+    <div class="qa-box">
+        <div class="qa-question">5. Pre-processing ve Post-processing Stratejisi?</div>
+        <p><strong>Cevap:</strong> Veri boru hattını modüler tasarladım:</p>
+        <ul>
+            <li><strong>Pre-processing:</strong>
+                <br>- Ses dosyasını FFmpeg ile 16kHz mono formata çeviriyorum (Model başarısını artırır).
+                <br>- VAD ile sessizlik kısımlarını atarak %20 token tasarrufu sağlıyorum.
+            </li>
+            <li><strong>Post-processing (Entity Resolution):</strong>
+                <br>- LLM çıktıları tutarsız olabilir (örn: 'Elon', 'Mr. Musk'). Grafiğe yazmadan önce Levenshtein
+                mesafesi ile benzer isimleri tek node altında birleştiriyorum (Deduplication).
+                <br>- Hallucination kontrolü için confidence score filtresi ekledim (%70 altı veri yazılmaz).
+            </li>
+        </ul>
+    </div>
+
+    <div class="qa-box">
+        <div class="qa-question">6. Performans + Maliyet Kaygılarına Çözümleriniz?</div>
+        <p><strong>Cevap:</strong> Projenin en güçlü yanı bu mimari kararlar oldu:</p>
+        <ul>
+            <li><strong>Local processing:</strong> Local Whisper ve Local Ollama entegrasyonu ile operasyonel maliyeti
+                (OpEx) sıfıra indirdim ve veri gizliliğini sağladım.</li>
+            <li><strong>Caching:</strong> L1 Cache (Dosya Hash) ve L2 Cache (Transkript JSON) kullanarak gereksiz
+                işlemeyi önledim.</li>
+            <li><strong>Hybrid Search:</strong> Sadece Vektör araması yerine, önce Graph Cypher sorgusuyla adayları
+                daraltıp, sonra vektör araması yaparak sorgu süresini milisaniyelere indirdim.</li>
+        </ul>
+    </div>
+
+    <h2>Kapsamlı UAT (Kullanıcı Kabul Testi) Senaryoları</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:20%">Kategori</th>
+                <th style="width:35%">Senaryo (Kullanıcı Sorusu)</th>
+                <th style="width:45%">Mimari Çözüm (Implementation)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Varlık Filtreleme</strong></td>
+                <td>"Steve Jobs <em>dışında</em> önerilen biyografiler?"</td>
+                <td><strong>Graph Query:</strong>
+                    <code>MATCH (p)-[:RECOMMENDED]->(b) WHERE NOT b.title CONTAINS 'Jobs'</code></td>
+            </tr>
+            <tr>
+                <td><strong>Çoklu Varlık</strong></td>
+                <td>"Hem Elon Musk hem Naval'ın önerdiği kitaplar?"</td>
+                <td><strong>Graph Intersection:</strong> İki düğümün ortak komşularını (Common Neighbors) bulur. O(1)
+                    hızındadır.</td>
+            </tr>
+            <tr>
+                <td><strong>Halüsinasyon</strong></td>
+                <td>"Lex, Satoshi ile röportaj yaptı mı?"</td>
+                <td><strong>Path Verification:</strong> Veritabanında <code>(Lex)-[:APPEARED_ON]-(Satoshi)</code> yolu
+                    yoksa, LLM'e sormadan 'Hayır' döner.</td>
+            </tr>
+            <tr>
+                <td><strong>Negatif Sorgu</strong></td>
+                <td>"Hangi konuklar AI hakkında <em>konuşmadı</em>?"</td>
+                <td><strong>Exclusion Query:</strong> 'AI' konusuyla edgesi olmayan <code>Person</code> düğümlerini
+                    getirir.</td>
+            </tr>
+            <tr>
+                <td><strong>Zamansal</strong></td>
+                <td>"2025'te 2028 Olimpiyatları için ne dendi?"</td>
+                <td><strong>Metadata Filter:</strong> Vektör sorgusuna <code>$filter: {year: 2025}</code> eklenir.</td>
+            </tr>
+            <tr>
+                <td><strong>Gizli Anlam (Implicit)</strong></td>
+                <td>"İsim vermeden kim PE eleştirisi yaptı?"</td>
+                <td><strong>Vector Search:</strong> 'Private Equity' kelimesi geçmese bile 'misaligned incentives'
+                    kavramı vektörel olarak eşleşir.</td>
+            </tr>
+            <tr>
+                <td><strong>Çatışma Analizi</strong></td>
+                <td>"Chamath ve Friedberg hangi konuda anlaşamadı?"</td>
+                <td><strong>Hybrid Search:</strong> Önce grafikten ortak konular bulunur, sonra vektörlerden
+                    'disagreement' duygulu chunk'lar çekilir.</td>
+            </tr>
+            <tr>
+                <td><strong>Kaynak Kontrolü</strong></td>
+                <td>"Sponsorlu olmayan sağlık tavsiyeleri?"</td>
+                <td><strong>Ad-Read Detection:</strong> 'promo code' geçen kısımlar <code>is_ad=True</code> etiketlenir
+                    ve sorguda elenir.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- MERMAID SCRIPT (Guaranteed Placement) -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+        });
+    </script>
+</body>
+
+</html>

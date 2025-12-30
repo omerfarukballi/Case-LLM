@@ -14,9 +14,15 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # API Keys
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    assemblyai_api_key: str = Field(..., env="ASSEMBLYAI_API_KEY")
+    openai_api_key: str = Field(default="sk-placeholder", env="OPENAI_API_KEY")
+    assemblyai_api_key: str = Field(default="placeholder", env="ASSEMBLYAI_API_KEY")
     
+    # Local LLM Settings (Ollama)
+    use_local_llm: bool = Field(default=True, env="USE_LOCAL_LLM")
+    local_llm_model: str = Field(default="mistral", env="LOCAL_LLM_MODEL")
+    local_LLM_api_base: str = Field(default="http://localhost:11434/v1", env="LOCAL_LLM_API_BASE")
+    local_whisper_model: str = Field(default="base", env="LOCAL_WHISPER_MODEL")
+
     # Neo4j Settings
     neo4j_uri: str = Field(default="bolt://localhost:7687", env="NEO4J_URI")
     neo4j_user: str = Field(default="neo4j", env="NEO4J_USER")

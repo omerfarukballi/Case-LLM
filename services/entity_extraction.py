@@ -115,64 +115,78 @@ class EntityExtractor:
     def chunk_transcript(
         self,
         segments: List[TranscriptSegment],
-        max_tokens: int = None
+        max_tokens: int = None,
+        overlap_tokens: int = 200
     ) -> List[TranscriptChunk]:
         """
-        Split transcript into chunks for processing.
-        
-        Args:
-            segments: List of transcript segments
-            max_tokens: Maximum tokens per chunk
-            
-        Returns:
-            List of TranscriptChunk objects
+        Split transcript into chunks with overlap and speaker boundary awareness.
         """
         max_tokens = max_tokens or self.settings.max_tokens_per_chunk
         chunks = []
-        current_text = []
-        current_start = 0
+        
+        current_segments = []
         current_tokens = 0
-        current_speaker = None
         chunk_index = 0
         
         for i, segment in enumerate(segments):
             segment_tokens = self.count_tokens(segment.text)
             
             # Start new chunk if would exceed limit
-            if current_tokens + segment_tokens > max_tokens and current_text:
+            if current_tokens + segment_tokens > max_tokens and current_segments:
+                chunk_text = " ".join([s.text for s in current_segments])
+                
+                # Identify main speaker
+                speaker_counts = defaultdict(int)
+                for s in current_segments:
+                    speaker_counts[s.speaker] += len(s.text)
+                main_speaker = max(speaker_counts.items(), key=lambda x: x[1])[0] if speaker_counts else current_segments[0].speaker
+                
                 chunk = TranscriptChunk(
-                    text=" ".join(current_text),
-                    start_time=current_start,
-                    end_time=segments[i-1].end if i > 0 else segment.start,
-                    speaker=current_speaker,
+                    text=chunk_text,
+                    start_time=current_segments[0].start,
+                    end_time=current_segments[-1].end,
+                    speaker=main_speaker,
                     chunk_index=chunk_index
                 )
                 chunks.append(chunk)
                 chunk_index += 1
-                current_text = []
-                current_start = segment.start
-                current_tokens = 0
+                
+                # Overlap logic
+                overlap_buffer_tokens = 0
+                overlap_segments = []
+                for seg in reversed(current_segments):
+                    seg_toks = self.count_tokens(seg.text)
+                    if overlap_buffer_tokens + seg_toks <= overlap_tokens:
+                        overlap_segments.insert(0, seg)
+                        overlap_buffer_tokens += seg_toks
+                    else:
+                        break
+                
+                current_segments = overlap_segments
+                current_tokens = overlap_buffer_tokens
             
-            # Add segment to current chunk
-            if not current_text:
-                current_start = segment.start
-                current_speaker = segment.speaker
-            
-            current_text.append(segment.text)
+            current_segments.append(segment)
             current_tokens += segment_tokens
         
         # Add final chunk
-        if current_text:
+        if current_segments:
+            chunk_text = " ".join([s.text for s in current_segments])
+            
+            speaker_counts = defaultdict(int)
+            for s in current_segments:
+                speaker_counts[s.speaker] += len(s.text)
+            main_speaker = max(speaker_counts.items(), key=lambda x: x[1])[0] if speaker_counts else current_segments[0].speaker
+            
             chunk = TranscriptChunk(
-                text=" ".join(current_text),
-                start_time=current_start,
-                end_time=segments[-1].end,
-                speaker=current_speaker,
+                text=chunk_text,
+                start_time=current_segments[0].start,
+                end_time=current_segments[-1].end,
+                speaker=main_speaker,
                 chunk_index=chunk_index
             )
             chunks.append(chunk)
         
-        logger.info(f"Split transcript into {len(chunks)} chunks")
+        logger.info(f"Split transcript into {len(chunks)} chunks with overlap")
         return chunks
     
     async def extract_entities_from_chunk(
@@ -182,13 +196,6 @@ class EntityExtractor:
     ) -> List[Entity]:
         """
         Extract entities from a single transcript chunk.
-        
-        Args:
-            chunk: The transcript chunk to process
-            podcast_context: Context about the podcast (name, hosts, date)
-            
-        Returns:
-            List of extracted Entity objects
         """
         prompt = ENTITY_EXTRACTION_PROMPT.format(
             podcast_name=podcast_context.get('podcast_name', 'Unknown'),
@@ -201,6 +208,10 @@ class EntityExtractor:
         )
         
         try:
+            if self.settings.use_local_llm:
+                return await self._extract_with_ollama(prompt, chunk.start_time)
+            
+            # OpenAI path
             response = await self.client.chat.completions.create(
                 model=self.settings.gpt_model,
                 messages=[
@@ -213,16 +224,35 @@ class EntityExtractor:
             )
             
             content = response.choices[0].message.content
-            
-            # Parse JSON response
             entities = self._parse_entity_response(content, chunk.start_time)
-            
             logger.debug(f"Extracted {len(entities)} entities from chunk {chunk.chunk_index}")
             return entities
             
         except Exception as e:
             logger.error(f"Entity extraction failed for chunk {chunk.chunk_index}: {e}")
             return []
+
+    async def _extract_with_ollama(self, prompt: str, start_time: float) -> List[Entity]:
+        """Use local Ollama model for extraction."""
+        import ollama
+        
+        # Run in executor to avoid blocking
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: ollama.chat(
+                model=self.settings.local_llm_model,
+                messages=[
+                    {"role": "system", "content": "You are a precise entity extraction assistant. Always return valid JSON with a list of entities."},
+                    {"role": "user", "content": prompt}
+                ],
+                format='json',
+                options={'temperature': 0.1, 'num_ctx': 4096}
+            )
+        )
+        
+        content = response['message']['content']
+        return self._parse_entity_response(content, start_time)
     
     def _parse_entity_response(self, content: str, default_timestamp: float) -> List[Entity]:
         """Parse GPT response into Entity objects."""

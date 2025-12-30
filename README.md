@@ -1,378 +1,126 @@
-<div align="center">
+# 🎙️ Podcast Knowledge Graph (GraphRAG System)
 
-# 🎙️ Podcast Knowledge Graph System
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Neo4j](https://img.shields.io/badge/GraphDB-Neo4j-018bff)
+![ChromaDB](https://img.shields.io/badge/VectorDB-Chroma-ff5c00)
+![Ollama](https://img.shields.io/badge/Local%20LLM-Ollama-black)
+![Privacy](https://img.shields.io/badge/Privacy-First-green)
 
-### AI-Powered Podcast Analysis with Knowledge Graph & Semantic Search
+A local-first **Graph Retrieval-Augmented Generation (GraphRAG)** system that transforms unstructured podcast audio into a structured, queryable Knowledge Graph.
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
-[![Neo4j](https://img.shields.io/badge/Neo4j-Graph_DB-008CC1?style=for-the-badge&logo=neo4j&logoColor=white)](https://neo4j.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
+> **Design Philosophy:** Privacy-First, Zero-Cost Operation, Hybrid Search Optimization.
 
----
+## 🌟 Key Features
 
-**Transform YouTube podcasts into queryable knowledge graphs with AI-powered entity extraction, semantic search, and hallucination-resistant answers.**
-
-[Features](#-features) • [Architecture](#-system-architecture) • [Quick Start](#-quick-start) • [Documentation](#-documentation)
-
-</div>
-
----
-
-## 📊 Key Metrics
-
-<div align="center">
-
-| Entity Precision | Query Latency | Entity Types | UAT Scenarios |
-|:----------------:|:-------------:|:------------:|:-------------:|
-| **>95%** | **<2s** | **10+** | **30** |
-
-</div>
+*   **🔒 Local-First Processing:** Runs entirely offline using **Ollama (Mistral)** for reasoning and **Whisper** for transcription. No data leaves your machine.
+*   **🕸️ Knowledge Graph Construction:** Automatically extracts and links entities (`Person`, `Book`, `Company`, `Topic`) with semantic relationships (`RECOMMENDED_BY`, `MENTIONED_IN`).
+*   **🧠 Hybrid Search:** Combines **Graph Traversal** (Cypher) for precision with **Vector Search** (ChromaDB) for semantic nuance.
+*   **🗣️ Speaker Diarization:** Identifies Hosts vs. Guests using acoustic segmentation and semantic heuristics.
+*   **⚡ Cost-Optimized:** Implements L1/L2 Caching and Local LLMs to eliminate API costs ($0 OpEx).
 
 ---
 
-## ✨ Features
+## 🏗️ Architecture
 
-<table>
-<tr>
-<td width="50%">
-
-### 🎵 YouTube Integration
-Download and process any YouTube podcast with **yt-dlp** audio extraction and automatic metadata fetching.
-
-### 🗣️ Speaker Diarization
-Identify **who said what** using AssemblyAI's advanced speaker labeling technology.
-
-### 🧠 Entity Extraction
-Extract **People, Books, Movies, Companies, Topics** using GPT-4 structured outputs with >95% precision.
-
-</td>
-<td width="50%">
-
-### 🔗 Knowledge Graph
-Build rich relationships in **Neo4j** with 10+ node types and 8+ relationship types.
-
-### 🔍 Semantic Search
-Vector similarity search using **OpenAI embeddings** and ChromaDB for content discovery.
-
-### 🛡️ Hallucination Prevention
-Multi-layer verification system ensures **accurate, evidence-based answers** with source citations.
-
-</td>
-</tr>
-</table>
-
----
-
-## 🏗️ System Architecture
+System pipeline using **Local-First GraphRAG**:
 
 ```mermaid
-flowchart TB
-    subgraph INPUT["📥 INPUT LAYER"]
-        YT[("📺 YouTube URL")]
-        BATCH[("📋 Batch JSON")]
-        UI[("🖥️ Streamlit UI")]
-        CLI[("⌨️ CLI")]
+graph TD
+    subgraph "1. Ingestion"
+        A[YouTube URL] -->|yt-dlp| B(Audio File)
+        B -->|Local Whisper| C[Transcription + Diarization]
+    end
+    
+    subgraph "2. Reasoning"
+        C -->|Chunking| D{Processing}
+        D -->|Ollama/Mistral| E[Entity Extraction]
+        D -->|Nomic Embed| F[Vector Embeddings]
+    end
+    
+    subgraph "3. Storage"
+        E -->|Structured Data| G[(Neo4j GraphDB)]
+        F -->|Vectors| H[(ChromaDB VectorStore)]
+    end
+    
+    subgraph "4. Retrieval"
+        I[User Query] -->|Router| J{Intent?}
+        J -->|Relational| K[Graph Query]
+        J -->|Semantic| L[Vector Search]
+        K & L -->|Hybrid Context| M[Final Answer]
     end
 
-    subgraph ORCHESTRATION["⚙️ ORCHESTRATION"]
-        MAIN["🎯 PodcastKnowledgeSystem<br/><i>main.py</i>"]
-    end
-
-    subgraph PROCESSING["🔄 PROCESSING PIPELINE"]
-        TRANS["🎵 Transcription<br/>yt-dlp + AssemblyAI"]
-        EXTRACT["🧠 Entity Extraction<br/>GPT-4 Turbo"]
-        STORAGE["💾 Storage<br/>Neo4j + ChromaDB"]
-    end
-
-    subgraph QUERY["🔍 QUERY LAYER"]
-        GRAPH["🔗 Graph Queries<br/><i>Cypher</i>"]
-        SEMANTIC["📊 Semantic Search<br/><i>Embeddings</i>"]
-        VERIFY["🛡️ Verification<br/><i>Anti-Hallucination</i>"]
-        HYBRID["⚡ Hybrid Query Engine"]
-    end
-
-    subgraph OUTPUT["📤 OUTPUT LAYER"]
-        ANS[("💬 Answers")]
-        SRC[("📚 Sources")]
-        VIZ[("📈 Visualizations")]
-        LINKS[("🔗 YouTube Links")]
-    end
-
-    INPUT --> MAIN
-    MAIN --> TRANS
-    TRANS --> EXTRACT
-    EXTRACT --> STORAGE
-    STORAGE --> QUERY
-    GRAPH --> HYBRID
-    SEMANTIC --> HYBRID
-    VERIFY --> HYBRID
-    HYBRID --> OUTPUT
-
-    style INPUT fill:#1e293b,stroke:#667eea,color:#fff
-    style ORCHESTRATION fill:#1e293b,stroke:#667eea,color:#fff
-    style PROCESSING fill:#1e293b,stroke:#22c55e,color:#fff
-    style QUERY fill:#1e293b,stroke:#8b5cf6,color:#fff
-    style OUTPUT fill:#1e293b,stroke:#f59e0b,color:#fff
-    style HYBRID fill:#667eea,stroke:#764ba2,color:#fff
+    style G fill:#018bff,stroke:#fff,color:#fff
+    style H fill:#ff5c00,stroke:#fff,color:#fff
+    style E fill:#000,stroke:#fff,color:#fff
 ```
 
----
-
-## 🛠️ Technology Stack
-
-<div align="center">
-
-| Layer | Technology | Purpose |
-|:-----:|:----------:|:-------:|
-| **Language** | ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white) | Core development |
-| **LLM** | ![OpenAI](https://img.shields.io/badge/GPT--4_Turbo-412991?style=flat-square&logo=openai&logoColor=white) | Entity extraction & synthesis |
-| **Embeddings** | ![OpenAI](https://img.shields.io/badge/text--embedding--3--small-412991?style=flat-square&logo=openai&logoColor=white) | Semantic vectors |
-| **Transcription** | ![AssemblyAI](https://img.shields.io/badge/AssemblyAI-000000?style=flat-square) | Speech-to-text + diarization |
-| **Graph DB** | ![Neo4j](https://img.shields.io/badge/Neo4j-008CC1?style=flat-square&logo=neo4j&logoColor=white) | Knowledge graph |
-| **Vector DB** | ![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6F61?style=flat-square) | Embedding storage |
-| **UI** | ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=flat-square&logo=streamlit&logoColor=white) | Web interface |
-| **Video** | ![yt-dlp](https://img.shields.io/badge/yt--dlp-FF0000?style=flat-square&logo=youtube&logoColor=white) | Audio extraction |
-
-</div>
+### Data Science Decisions
+*   **Chunking:** Context-Aware Overlapping Windows (2000 tokens + 10% overlap).
+*   **Graph Schema:** Property-rich edges (e.g., `RECOMMENDED_BY` has `sentiment`, `timestamp`).
+*   **Diarization:** Hybrid approach using Whisper segments + Semantic Role Labeling.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
-- Python 3.10+
-- Docker (for Neo4j)
-- API Keys: OpenAI, AssemblyAI
+*   Python 3.10+
+*   **FFmpeg** (for audio processing): `brew install ffmpeg`
+*   **Ollama** (for Local LLM): [Download Ollama](https://ollama.ai/)
+    *   Pull the model: `ollama pull mistral`
+    *   Start server: `ollama serve`
 
 ### Installation
 
-```bash
-# Clone repository
-git clone https://github.com/yourusername/podcast-kg.git
-cd podcast-kg
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/omerfarukballi/Case-LLM.git
+    cd podcast-kg
+    ```
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+2.  **Install Dependencies**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-# Install dependencies
-pip install -r requirements.txt
+3.  **Configuration**
+    Copy `.env.example` to `.env`:
+    ```bash
+    cp .env.example .env
+    ```
+    *Set `USE_LOCAL_LLM=True` in `.env` for offline mode.*
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your API keys
-```
-
-### Start Neo4j
-
-```bash
-docker run -d --name neo4j \
-  -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/yourpassword \
-  neo4j:latest
-```
-
-### Process Your First Video
-
-```bash
-# Process a YouTube video
-python main.py --url "https://youtube.com/watch?v=VIDEO_ID" --podcast "Podcast Name"
-
-# Query the knowledge graph
-python main.py --query "List all books recommended in podcasts"
-
-# Launch Streamlit UI
-streamlit run ui/app.py
-```
+4.  **Run the UI**
+    ```bash
+    streamlit run ui/app.py
+    ```
 
 ---
 
-## 📁 Project Structure
+## 🛠️ Technology Stack
 
-```
-podcast-kg/
-├── 📄 main.py                    # Main orchestrator & CLI
-├── ⚙️ config.py                   # Configuration settings
-├── 📦 models/
-│   ├── entities.py               # Pydantic data models
-│   └── graph_schema.py           # Neo4j schema definitions
-├── 🔧 services/
-│   ├── transcription.py          # YouTube download & transcription
-│   ├── entity_extraction.py      # GPT-4 entity extraction
-│   ├── graph_builder.py          # Neo4j operations
-│   ├── vector_store.py           # ChromaDB semantic search
-│   └── query_engine.py           # Hybrid query engine
-├── 🖥️ ui/
-│   ├── app.py                    # Streamlit main app
-│   └── components.py             # UI components
-├── 🧪 tests/
-│   ├── test_uat.py               # 30 UAT test scenarios
-│   └── test_integration.py       # Integration tests
-└── 📂 data/
-    └── videos.json               # Video configurations
-```
+| Component | Technology | Role |
+| :--- | :--- | :--- |
+| **LLM** | Ollama (Mistral) / GPT-4 | Entity Extraction & Reasoning |
+| **STT** | OpenAI Whisper (Local) | Speech-to-Text Transcription |
+| **Graph DB** | Neo4j | Storing structured relationships |
+| **Vector DB** | ChromaDB | Semantic search & Context retrieval |
+| **Framework** | LangChain / Pydantic | Orchestration & Data Validation |
+| **UI** | Streamlit | Interactive Dashboard |
 
----
+## 🧪 UAT Scenario Verification
 
-## 🔍 Query Types
+This architecture was specifically built to pass complex User Acceptance Tests:
 
-<table>
-<tr>
-<td align="center" width="25%">
-<h3>🔗 GRAPH</h3>
-<p><i>Relationships & connections</i></p>
-<code>"List all books recommended by David Senra"</code>
-</td>
-<td align="center" width="25%">
-<h3>📊 SEMANTIC</h3>
-<p><i>Content & quotes</i></p>
-<code>"What did they say about AI safety?"</code>
-</td>
-<td align="center" width="25%">
-<h3>⚡ HYBRID</h3>
-<p><i>Graph + Semantic</i></p>
-<code>"Trace AI concept across podcasts"</code>
-</td>
-<td align="center" width="25%">
-<h3>🛡️ VERIFY</h3>
-<p><i>Fact checking</i></p>
-<code>"Did Lex Fridman interview X?"</code>
-</td>
-</tr>
-</table>
+| Challenge Category | UAT Scenario Example | Our Architectural Solution |
+| :--- | :--- | :--- |
+| **1. Complex Logic** | *"Books recommended by David Senra excluding Steve Jobs bios?"* | **Graph Schema:** `(Person)-[:RECOMMENDED]->(Book)` with Cypher filtering. |
+| **2. Hallucinations** | *"Did Lex Fridman interview Satoshi?"* | **Graph Validation:** Verifies path existence `(Lex)-[:APPEARED_ON]-(Satoshi)` before answering. |
+| **3. Temporal Logic** | *"What was said about 'Olympics' in 2024?"* | **Metadata Filtering:** Enforces `year: 2024` filter in Vector Search. |
+| **4. Synthesis** | *"Common guests between All-In and JRE?"* | **Graph Intersection:** O(1) complexity query for node intersection. |
+| **5. Implicit Meaning** | *"Who criticized PE implicitly?"* | **Semantic Search:** Embeddings capture concepts ("misaligned incentives") without keywords. |
 
----
+## 📄 Documentation
 
-## 🛡️ Hallucination Prevention
-
-> ⚠️ **Critical Feature**: Multi-layer verification prevents AI hallucinations
-
-| Layer | Check | Action |
-|:-----:|:-----:|:------:|
-| 1️⃣ **Entity Verification** | Does entity exist in graph? | Reject if not found |
-| 2️⃣ **Relationship Check** | Does claimed relationship exist? | Verify before answering |
-| 3️⃣ **Date Filtering** | Is content within date range? | Filter out-of-range |
-| 4️⃣ **Speaker Validation** | Did speaker appear in episode? | Verify attribution |
-| 5️⃣ **Evidence-Based** | Is answer based on data? | Never invent information |
-
----
-
-## 🧪 UAT Test Scenarios
-
-<details>
-<summary><b>📚 Entity Extraction (UAT-01 to UAT-10)</b></summary>
-
-- ✅ Book recommendations with filters
-- ✅ Movie metaphor extraction
-- ✅ Common guests between podcasts
-- ✅ Company sentiment tracking
-- ✅ Entity disambiguation (book vs movie)
-- ✅ Implicit reference detection
-- ✅ Fact checking
-- ✅ Sponsor filtering
-- ✅ Location extraction
-- ✅ Music references
-
-</details>
-
-<details>
-<summary><b>🛡️ Hallucination Resistance (UAT-11 to UAT-20)</b></summary>
-
-- ⚠️ False premise rejection
-- ⚠️ Fake quote verification
-- ⚠️ Phantom speaker detection
-- ⚠️ Date boundary enforcement
-- ⚠️ Context disambiguation
-- ⚠️ Data unavailability handling
-- ⚠️ Ghost entity rejection
-- ⚠️ Mismatched host-podcast
-- ⚠️ Query speed requirements (<2s)
-- ⚠️ Negative search handling
-
-</details>
-
-<details>
-<summary><b>🧠 Synthesis & Logic (UAT-21 to UAT-30)</b></summary>
-
-- ✅ Concept tracing across podcasts
-- ✅ Conflict detection between speakers
-- ✅ Cross-reference counting
-- ✅ Sentiment pivot detection
-- ✅ First mention identification
-- ✅ Person profile building
-- ✅ Recommendation attribution
-- ✅ Behavioral pattern detection
-- ✅ Episode summarization
-- ✅ Missing channel handling
-
-</details>
-
-```bash
-# Run all tests
-pytest tests/test_uat.py -v
-
-# Run specific category
-pytest tests/test_uat.py::TestHallucinationResistanceUAT -v
-```
-
----
-
-## 📦 Module Reference
-
-| Module | File | Key Functions |
-|:------:|:----:|:-------------:|
-| **Configuration** | `config.py` | `get_settings()`, `get_logger()`, `GRAPH_SCHEMA` |
-| **Data Models** | `models/entities.py` | `Entity`, `Episode`, `TranscriptSegment`, `QueryResult` |
-| **Transcription** | `services/transcription.py` | `download_youtube_audio()`, `transcribe_with_diarization()` |
-| **Entity Extraction** | `services/entity_extraction.py` | `extract_all_entities()`, `deduplicate_entities()` |
-| **Graph Builder** | `services/graph_builder.py` | `add_episode()`, `add_entities_batch()`, `execute_cypher()` |
-| **Vector Store** | `services/vector_store.py` | `add_transcript_chunks()`, `search()`, `embed_text()` |
-| **Query Engine** | `services/query_engine.py` | `query()`, `verify_claim()`, `generate_cypher()` |
-| **Orchestrator** | `main.py` | `process_video()`, `batch_process()`, `query()` |
-
----
-
-## 📈 Performance
-
-| Metric | Target | Notes |
-|:------:|:------:|:-----:|
-| **Simple Query Latency** | < 2.0s | Keyword searches, simple graphs |
-| **Complex Query Latency** | < 5.0s | Hybrid, cross-podcast analysis |
-| **Entity Precision** | > 95% | Verified against manual annotation |
-| **Hallucination Rate** | 0% | For verification queries |
-| **Processing Time** | ~5-10 min/hour | Per hour of podcast content |
-
----
-
-## 📖 Documentation
-
-- 📄 [Technical Documentation (HTML)](docs/TECHNICAL_DOCUMENTATION.html) - Full visual documentation
-- 📄 [Technical Documentation (Markdown)](docs/TECHNICAL_DOCUMENTATION.md) - Detailed text version
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-MIT License - See [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-
-**Built with ❤️ using Python, OpenAI, Neo4j, and ChromaDB**
-
-[![Stars](https://img.shields.io/github/stars/yourusername/podcast-kg?style=social)](https://github.com/yourusername/podcast-kg)
-
-</div>
+*   [🇹🇷 Teknik Dökümantasyon (Turkish)](docs/TEKNIK_DOKUMANTASYON_TR.html) - Detailed Interview Guide
+*   [🇺🇸 Technical Documentation (English)](docs/TECHNICAL_DOCUMENTATION.html) - Architecture & QA

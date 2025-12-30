@@ -149,14 +149,7 @@ class TranscriptionService:
         speakers_expected: Optional[int] = None
     ) -> List[TranscriptSegment]:
         """
-        Transcribe audio with speaker diarization using AssemblyAI.
-        
-        Args:
-            audio_path: Path to the audio file
-            speakers_expected: Expected number of speakers (optional)
-            
-        Returns:
-            List of TranscriptSegment objects with speaker labels
+        Transcribe audio using either AssemblyAI (Cloud) or Whisper (Local).
         """
         # Check for cached transcript
         cache_key = self._get_cache_key(audio_path)
@@ -165,9 +158,58 @@ class TranscriptionService:
             logger.info(f"Using cached transcript: {cache_key}")
             return cached
         
-        logger.info(f"Transcribing audio with diarization: {audio_path}")
+        if self.settings.use_local_llm:
+            return await self._transcribe_local_whisper(audio_path, cache_key)
+        else:
+            return await self._transcribe_assemblyai(audio_path, speakers_expected, cache_key)
+
+    async def _transcribe_local_whisper(self, audio_path: str, cache_key: str) -> List[TranscriptSegment]:
+        """Transcribe using local Whisper model."""
+        import whisper
+        import torch
         
-        # Configure transcription
+        logger.info(f"Transcribing locally with Whisper ({self.settings.local_whisper_model})...")
+        
+        try:
+            # Load model
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            # For Mac M1/M2, use 'cpu' or 'mps' (Whisper supports cpu well)
+            if torch.backends.mps.is_available():
+                device = "mps"
+                
+            model = whisper.load_model(self.settings.local_whisper_model, device=device)
+            print(f"Whisper model loaded on {device}")
+            
+            # Transcribe
+            # Run in executor to avoid blocking async loop
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: model.transcribe(audio_path, fp16=False) # fp16=False for CPU compatibility
+            )
+            
+            segments = []
+            for seg in result["segments"]:
+                segments.append(TranscriptSegment(
+                    text=seg["text"].strip(),
+                    start=seg["start"],
+                    end=seg["end"],
+                    speaker="Speaker",  # Whisper base doesn't distinguish speakers
+                    confidence=1.0  # Whisper doesn't give segment confidnece easily
+                ))
+            
+            self._cache_transcript(cache_key, segments)
+            logger.info(f"Local transcription complete: {len(segments)} segments")
+            return segments
+            
+        except Exception as e:
+            logger.error(f"Local Whisper transcription failed: {e}")
+            raise
+
+    async def _transcribe_assemblyai(self, audio_path: str, speakers_expected: int, cache_key: str) -> List[TranscriptSegment]:
+        """Transcribe using AssemblyAI API."""
+        logger.info(f"Transcribing audio with diarization (AssemblyAI): {audio_path}")
+        
         config = aai.TranscriptionConfig(
             speaker_labels=True,
             speakers_expected=speakers_expected,
@@ -177,7 +219,6 @@ class TranscriptionService:
         )
         
         try:
-            # Run transcription in thread pool
             loop = asyncio.get_event_loop()
             transcript = await loop.run_in_executor(
                 None,
@@ -187,13 +228,8 @@ class TranscriptionService:
             if transcript.status == aai.TranscriptStatus.error:
                 raise Exception(f"Transcription failed: {transcript.error}")
             
-            # Convert to TranscriptSegment objects
             segments = self._parse_transcript(transcript)
-            
-            # Cache the result
             self._cache_transcript(cache_key, segments)
-            
-            logger.info(f"Transcription complete: {len(segments)} segments")
             return segments
             
         except Exception as e:

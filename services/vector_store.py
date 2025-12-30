@@ -80,6 +80,19 @@ class VectorStore:
             logger.error(f"Embedding generation failed: {e}")
             raise
     
+    def create_transcript_chunks(
+        self,
+        segments: List[Any],  # TranscriptSegment
+        max_tokens: int = 2000,
+        overlap_tokens: int = 200
+    ) -> List[TranscriptChunk]:
+        """
+        Create overlapping chunks for vector storage using EntityExtractor's logic.
+        """
+        # Import here to avoid circular dependency
+        from services.entity_extraction import chunk_transcript
+        return chunk_transcript(segments, max_tokens, overlap_tokens)
+
     def embed_texts_batch(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for multiple texts in batch.
